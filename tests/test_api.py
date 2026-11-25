@@ -1,22 +1,19 @@
 import pytest
 from fastapi.testclient import TestClient
 from main import app
-from models.users import User
-from routers.products import productos
-from routers.users import usuarios
+from repositories.products import productos_repo
+from repositories.users import usuarios_repo
 
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
 def reiniciar_datos():
-    usuarios[:] = [
-        User(id=1, name="Juan Pérez"),
-        User(id=2, name="Ana López", is_active=False),
-    ]
-    productos.clear()
+    usuarios_repo.reset()
+    productos_repo.reset()
     yield
-    productos.clear()
+    usuarios_repo.reset()
+    productos_repo.reset()
 
 
 def test_documentacion():
@@ -47,7 +44,7 @@ def test_crud_usuario():
 
 def test_usuario_duplicado():
     assert client.post("/user", json={"id": 1, "name": "Otro"}).status_code == 409
-    assert len(usuarios) == 2
+    assert len(client.get("/user").json()["users"]) == 2
 
 
 @pytest.mark.parametrize("datos", [
@@ -55,7 +52,7 @@ def test_usuario_duplicado():
 ])
 def test_usuario_invalido(datos):
     assert client.post("/user", json=datos).status_code == 422
-    assert len(usuarios) == 2
+    assert len(client.get("/user").json()["users"]) == 2
 
 
 def test_usuario_no_encontrado():
@@ -95,7 +92,7 @@ def test_filtrar_productos():
 def test_producto_duplicado():
     client.post("/products", json=producto())
     assert client.post("/products", json=producto()).status_code == 409
-    assert len(productos) == 1
+    assert len(client.get("/products").json()) == 1
 
 
 @pytest.mark.parametrize("campo,valor", [
@@ -105,7 +102,7 @@ def test_producto_invalido(campo, valor):
     datos = producto()
     datos[campo] = valor
     assert client.post("/products", json=datos).status_code == 422
-    assert productos == []
+    assert client.get("/products").json() == []
 
 
 def test_actualizacion_invalida_no_modifica():
